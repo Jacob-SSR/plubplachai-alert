@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ระบบแจ้งเตือนนัดผู้ป่วย โรงพยาบาลพลับพลาชัย (plubplachai-alert)
 
-## Getting Started
+อ่านวันนัดของผู้ป่วย**ทุกคลินิก**จาก HOSxP (ตาราง `oapp`) แล้วแจ้งผู้ป่วยทาง LINE หมอพร้อม (MOPH Alert) ด้วยเลขบัตรประชาชนในทะเบียนผู้ป่วย เจ้าหน้าที่ยังลงนัด เลื่อนนัด และยกเลิกนัดใน HOSxP ตามเดิม ระบบนี้อ่านอย่างเดียว ไม่เขียนกลับ HOSxP
 
-First, run the development server:
+เป็นระบบพี่น้องของ [plaplachai-health-check](https://github.com/Jacob-SSR/plaplachai-health-check) ใช้โครงสร้างเดียวกัน (Next.js + MySQL + worker + MOPH Alert) แต่ต่างกันดังนี้
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+| | plaplachai-health-check | plubplachai-alert |
+|---|---|---|
+| ผู้รับ | บุคลากร (จับคู่ `patient` กับ `doctor`) | ผู้ป่วยทุกคนที่มีนัด |
+| คลินิก | 4 ห้อง: กายภาพ LAB ทันตกรรม แผนไทย | ทุกคลินิกจากตาราง `clinic` เลือกเปิด/ปิดได้ทีละคลินิก |
+| เลขบัตรผู้รับ | ทะเบียนบุคลากร (เข้ารหัสเก็บไว้) | อ่าน `patient.cid` จาก HOSxP ตอนส่งเท่านั้น **ไม่เก็บ CID** |
+| ทะเบียน/ปีงบ/แผนตรวจ | มี | ไม่มี |
+| หน้าเว็บ | ปฏิทินสาธารณะ + หน้า admin | เฉพาะเจ้าหน้าที่ (login) |
+| เพิ่มเติม | — | ช่วงเวลาส่ง (ไม่ส่งกลางคืน), งดส่งรายคน (HN), คำแนะนำประจำคลินิก, อ่าน HOSxP ทีละสัปดาห์ |
+
+## ส่งเมื่อไหร่
+
+- **ลงนัดใหม่ / เลื่อนนัด** เมื่อ worker พบนัดใหม่ หรือวัน เวลา คลินิก จุดติดต่อ สถานะเปลี่ยน (แก้ชื่อแพทย์หรือหมายเหตุไม่ส่งซ้ำ)
+- **เตือนก่อนวันนัด** ได้สูงสุด 3 รอบ (ค่าเริ่มต้น 1 วันก่อนนัด เริ่มส่ง 08:00 น.) ไม่ส่งซ้ำถ้าเพิ่งแจ้งนัดไปภายใน 12 ชั่วโมง
+- **ยกเลิกนัด** เมื่อนัดที่ยังไม่ถึงวันถูกลบหรือเปลี่ยนเป็นสถานะยกเลิกใน HOSxP (ตรวจกับ HOSxP ซ้ำก่อน ไม่ส่งถ้าข้อมูลไม่แน่นอน)
+- **กดส่งเอง** ปุ่ม “ส่งแจ้งเตือน” ในเมนูนัดหมาย
+
+กฎที่ใช้ทุกครั้ง: ส่งเฉพาะคลินิกที่เปิดไว้ (ยกเว้นกดส่งเอง), ไม่ส่งนอกช่วงเวลาที่ตั้ง (ค่าเริ่มต้น 07:00–20:00 น. ข้อความที่เกิดตอนกลางคืนจะรอถึงเช้า), ไม่ส่งให้ HN ที่อยู่ในรายการงดส่ง, และก่อนส่งทุกครั้งจะอ่านนัดจาก HOSxP ใหม่ ถ้าไม่ตรงกับที่คิวไว้จะยกเลิกข้อความนั้นแทนการส่งข้อมูลเก่า
+
+รอบแรกที่ worker อ่าน HOSxP เป็นการบันทึกฐาน ไม่ส่งข้อความให้นัดที่มีอยู่แล้ว เปิดคลินิกใหม่ภายหลังก็เช่นกัน: ส่งเฉพาะการเปลี่ยนแปลงหลังเปิด และข้อความเตือนก่อนวันนัด
+
+## ติดตั้ง (Node บนเครื่อง + ฐานข้อมูล Docker)
+
+ใช้ Node.js 22 ขึ้นไป (แนะนำ 24 LTS), Docker Engine + Compose พอร์ตค่าเริ่มต้นเลือกให้ไม่ชนกับ health-check: MySQL 3308, phpMyAdmin 6070, เว็บ 5700
+
+```powershell
+Copy-Item .env.example .env   # แล้วแก้ค่าใน .env
+npm ci
+docker compose up -d mysql phpmyadmin
+npm run db:migrate
+npm run db:bootstrap          # สร้างบัญชี ADMIN_USERNAME / ADMIN_PASSWORD แล้วลบ ADMIN_PASSWORD ออกจาก .env
+npm run build
+npm run start                 # http://localhost:5700
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+เปิด terminal อีกหน้าสำหรับ worker (อ่าน HOSxP ทุก 2 นาที และส่งข้อความระหว่างรอบ)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```powershell
+npm run worker
+npm run worker:once   # ทำหนึ่งรอบแล้วจบ สำหรับตรวจระบบ
+npm run hosxp:sync    # อ่านคลินิกและนัดจาก HOSxP หนึ่งครั้ง
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+หรือรันทั้งหมดใน Docker: `docker compose --profile app up -d` (รัน `npm run db:migrate` และ `db:bootstrap` ผ่าน `docker compose --profile app run --rm app ...` ก่อน)
 
-## Learn More
+## ค่าที่ต้องตั้งใน .env
 
-To learn more about Next.js, take a look at the following resources:
+- `HOSXP_DB_*` บัญชี **SELECT อย่างเดียว** ที่อ่าน `oapp, patient, clinic, doctor, kskdepartment` (และ `lab_app_head, lab_app_order, lab_app_order_service, lab_items` ถ้าต้องการแสดงรายการตรวจ LAB)
+- `MOPH_CLIENT_KEY / MOPH_SECRET_KEY` ใช้คู่เดียวกับ health-check ได้, `MOPH_LIVE_ENABLED=true` เมื่อพร้อมส่งจริง
+- `HOSPITAL_CONTACT` ข้อความท้ายแจ้งเตือน เช่น `ห้องบัตร โทร 044-xxxxxx`
+- `HOSXP_SYNC_DAYS` (60) ติดตามนัดล่วงหน้ากี่วัน, `HOSXP_SYNC_INTERVAL_SECONDS` (120), `MOPH_SEND_INTERVAL_MS` (500) เว้นระยะระหว่างข้อความ
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## เปิดใช้งานทีละขั้น
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. รัน worker ให้อ่าน HOSxP รอบแรก (ดูสถานะที่เมนู **ภาพรวม**)
+2. เมนู **คลินิก**: เปิดคลินิกนำร่อง 1–2 คลินิก ใส่คำแนะนำการเตรียมตัวประจำคลินิกถ้ามี
+3. เมนู **แจ้งเตือน**: เปิดการแจ้งเตือนในโหมด **ทดสอบ** ตรวจรายการ “ทดสอบ ไม่ได้ส่งจริง” ว่าถูกคน ถูกนัด
+4. ใช้ “ส่งข้อความทดสอบ” ด้วยเลขบัตรของเจ้าหน้าที่ แล้วตรวจ LINE หมอพร้อม
+5. ตั้ง `MOPH_LIVE_ENABLED=true` restart app/worker แล้วเปลี่ยนเป็นโหมด **ส่งจริง**
+6. ค่อยๆ เปิดคลินิกเพิ่ม
 
-## Deploy on Vercel
+บทบาท: **ผู้ดูแลระบบ** ตั้งค่าได้ทุกอย่าง, **เจ้าหน้าที่** ดูนัด กดส่งแจ้งเตือน และบันทึกงดส่งรายคนได้
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## ความเป็นส่วนตัว
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- ไม่เก็บเลขบัตรประชาชน อ่านจาก HOSxP ตอนส่งแล้วทิ้ง ส่งทดสอบก็ไม่บันทึกเลขบัตร
+- เก็บเฉพาะ HN ชื่อ คลินิก วันเวลานัด จุดติดต่อ ชื่อแพทย์ ของนัดในช่วงที่ติดตาม
+- ข้อความแจ้งเตือนไม่มีการวินิจฉัย แสดงเฉพาะหมวดการตรวจ (เลือด ปัสสาวะ อื่นๆ)
+- ประวัติการใช้งาน (audit) ไม่บันทึก CID หรือเนื้อหาข้อความ
+
+## พัฒนา / ทดสอบ
+
+```bash
+npm run lint && npm run typecheck && npm test
+# integration ต้องใช้ฐานทดสอบที่ชื่อลงท้าย _test
+ALLOW_TEST_DATABASE=true DB_NAME=ppc_alert_test npm run test:integration
+```
+
+Next.js รุ่นนี้มีการเปลี่ยนแปลงจากรุ่นเดิม อ่านเอกสารใน `node_modules/next/dist/docs/` ก่อนแก้โค้ด (ดู AGENTS.md)

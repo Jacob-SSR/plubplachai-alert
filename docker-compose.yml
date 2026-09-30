@@ -1,0 +1,56 @@
+name: ppc-alert
+services:
+  mysql:
+    image: mysql:8.4
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--default-time-zone=+00:00"]
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-ppc_alert}
+      MYSQL_USER: ${DB_USER:-alert_app}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD}
+    ports: ["127.0.0.1:${MYSQL_HOST_PORT:-3308}:3306"]
+    volumes: ["alert_mysql_data:/var/lib/mysql"]
+    networks: [alert]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      # First start initialises the data directory; on slow Windows disks this can take minutes.
+      start_period: 15m
+  phpmyadmin:
+    image: phpmyadmin:5.2
+    environment:
+      PMA_HOST: mysql
+      UPLOAD_LIMIT: 16M
+    ports: ["127.0.0.1:${PMA_HOST_PORT:-6070}:80"]
+    depends_on:
+      mysql: { condition: service_healthy }
+    networks: [alert]
+    restart: unless-stopped
+  app:
+    build: .
+    env_file: .env
+    environment: { DB_HOST: mysql, DB_PORT: 3306, NODE_ENV: production }
+    # Web is reachable from other computers on the LAN; set APP_BIND=127.0.0.1 to keep it local.
+    ports: ["${APP_BIND:-0.0.0.0}:${APP_HOST_PORT:-5700}:5700"]
+    depends_on:
+      mysql: { condition: service_healthy }
+    networks: [alert]
+    restart: unless-stopped
+    profiles: [app]
+  worker:
+    build: .
+    command: ["npm", "run", "worker"]
+    env_file: .env
+    environment: { DB_HOST: mysql, DB_PORT: 3306, NODE_ENV: production }
+    depends_on:
+      mysql: { condition: service_healthy }
+    networks: [alert]
+    restart: unless-stopped
+    profiles: [app]
+networks:
+  alert:
+volumes:
+  alert_mysql_data:

@@ -1,0 +1,60 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { inSendWindow, nextSendTime } from '../src/domain/send-window';
+import { noticeText, noticeMessage, noticePreparation, noticeFlex, type Notice } from '../src/domain/notice';
+import { validCid } from '../src/domain/validation';
+import { mophRequest, classifyResponse } from '../src/providers/moph-alert';
+
+const window = { start: '07:00', end: '20:00' };
+const at = (bangkok: string) => new Date(`${bangkok}+07:00`);
+
+test('send window: inside sends now, night waits for the next opening (Bangkok time, stored UTC)', () => {
+  assert.equal(inSendWindow(window, at('2026-10-01T07:00:00')), true);
+  assert.equal(inSendWindow(window, at('2026-10-01T19:59:00')), true);
+  assert.equal(inSendWindow(window, at('2026-10-01T20:00:00')), false);
+  assert.equal(nextSendTime(window, at('2026-10-01T12:00:00')), null);
+  // 22:30 on the 1st -> 07:00 on the 2nd Bangkok = 00:00 UTC on the 2nd.
+  assert.equal(nextSendTime(window, at('2026-10-01T22:30:00')), '2026-10-02 00:00:00.000');
+  // 05:00 on the 2nd -> 07:00 the same day.
+  assert.equal(nextSendTime(window, at('2026-10-02T05:00:00')), '2026-10-02 00:00:00.000');
+});
+
+const base: Notice = { kind: 'NEW', name: 'สมชาย ใจดี', date: '2026-10-15', time: '09:30:00', clinic: 'คลินิกเบาหวาน', location: 'OPD ชั้น 1' };
+test('patient notice shows clinic, time, what to bring and how to reschedule', () => {
+  const text = noticeText({ ...base, contact: 'ห้องบัตร โทร 044-000000' });
+  assert.match(text, /แจ้งวันนัดหมาย/);
+  assert.match(text, /เรียน คุณสมชาย ใจดี/);
+  assert.match(text, /คลินิก : คลินิกเบาหวาน/);
+  assert.match(text, /09:30 น\./);
+  assert.match(text, /บัตรประจำตัวประชาชน/);
+  assert.match(text, /โปรดติดต่อ ห้องบัตร โทร 044-000000/);
+  assert.match(noticeText({ ...base, time: null }), /โปรดติดต่อเจ้าหน้าที่เพื่อยืนยันเวลา/);
+});
+test('notice kinds: reminder lead, changed title, cancellation has no preparation', () => {
+  assert.match(noticeText({ ...base, kind: 'REMINDER', daysBefore: 1 }), /พรุ่งนี้เป็นวันนัดของท่าน/);
+  assert.match(noticeText({ ...base, kind: 'REMINDER', daysBefore: 0 }), /วันนี้เป็นวันนัดของท่าน/);
+  assert.match(noticeText({ ...base, kind: 'CHANGED' }), /แจ้งเปลี่ยนแปลงวันนัด/);
+  const cancelled = noticeText({ ...base, kind: 'CANCELLED', tests: ['FBS'] });
+  assert.match(cancelled, /ถูกยกเลิกแล้ว/);
+  assert.doesNotMatch(cancelled, /สิ่งที่ต้องนำมา|การตรวจ :/);
+});
+test('preparation: HOSxP lines then the clinic note; generic LAB advice only as a fallback', () => {
+  assert.deepEqual(noticePreparation({ ...base, preparation: ['งดน้ำงดอาหาร'], clinicNote: 'นำยาเดิมมาด้วย\n\nงดน้ำงดอาหาร' }), ['งดน้ำงดอาหาร', 'นำยาเดิมมาด้วย']);
+  assert.match(noticePreparation({ ...base, tests: ['FBS'] })[0], /งดอาหาร/);
+  assert.deepEqual(noticePreparation({ ...base, tests: ['FBS'], clinicNote: 'มาก่อน 8 โมง' }), ['มาก่อน 8 โมง']);
+});
+test('outbound: HTML is escaped and the flex card carries the title', () => {
+  const m = noticeMessage({ ...base, clinic: '<b>X</b>' });
+  assert.match(m.html, /&lt;b&gt;X&lt;\/b&gt;/);
+  assert.equal((noticeFlex(base) as { altText: string }).altText.startsWith('แจ้งวันนัดหมาย'), true);
+  const req = mophRequest('1101700203450', m, 'template');
+  assert.equal((req.body as { name: string }).name, 'สมชาย ใจดี');
+});
+test('CID checksum and MOPH response classification', () => {
+  assert.equal(validCid('1101700203450'), true);
+  assert.equal(validCid('1101700203451'), false);
+  assert.equal(validCid(''), false);
+  assert.equal(classifyResponse(200, { message_code: '200' }).outcome, 'ACCEPTED');
+  assert.equal(classifyResponse(500, {}).outcome, 'UNKNOWN');
+  assert.equal(classifyResponse(200, { message_code: '401', message: 'no cid' }).outcome, 'REJECTED');
+});

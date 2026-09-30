@@ -1,0 +1,12 @@
+node_modules
+private
+*.seed.json
+INFOMATION_PERSON*.xlsx
+.next
+.git
+.env*
+!.env.example
+test-results
+playwright-report
+*.patch
+*.log
