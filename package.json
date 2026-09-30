@@ -1,26 +1,46 @@
 {
-  "name": "plaplachai-alert",
+  "name": "plubplachai-alert",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 5700",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "next start -p 5700",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:integration": "node --import tsx --test --test-concurrency=1 tests/integration/*.test.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:bootstrap": "tsx scripts/bootstrap.ts",
+    "db:reset-password": "tsx scripts/reset-password.ts",
+    "hosxp:sync": "tsx scripts/sync-hosxp.ts",
+    "worker": "tsx workers/notifications.ts",
+    "worker:once": "tsx workers/notifications.ts --once"
   },
   "dependencies": {
+    "@fontsource/noto-sans-thai": "^5.3.0",
+    "@fontsource/sarabun": "^5.3.0",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^18.0.4",
+    "lucide-react": "^1.49.0",
+    "mysql2": "^3.24.5",
     "next": "16.3.7",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^24.19.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.7",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
