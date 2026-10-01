@@ -63,3 +63,4 @@ small.lab-tests{display:block;color:#763993}
 .notice-card.kind-cancelled .notice-card-head{background:#b91c1c}
 .error-text{color:var(--danger)}
 .clinic-note{white-space:pre-line;font-size:13px;display:block;margin-bottom:4px}
+td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}td small{display:block}.badge.status-attended{background:#e4f2dd;color:#2f5d1f}.badge.status-pending{background:#e1effa;color:#15567f}.badge.status-missed{background:#fde4e1;color:#9f1d12}

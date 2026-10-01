@@ -1,11 +1,12 @@
 'use client';
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CalendarDays, Stethoscope, Bell, UserX, ShieldCheck, History, LogOut, LayoutDashboard } from 'lucide-react';
+import { CalendarDays, Stethoscope, Bell, UserX, ShieldCheck, History, LogOut, LayoutDashboard, FileBarChart } from 'lucide-react';
 import type { Actor } from '@/src/server/auth';
 import { HospitalLogo } from './hospital-logo';
 import { Overview } from './overview';
 import { Appointments } from './appointments';
+import { Reports } from './reports';
 import { Clinics } from './clinics';
 import { Notifications } from './notifications';
 import { OptOuts } from './opt-outs';
@@ -15,6 +16,7 @@ import { type Api } from './ui';
 const nav = [
   { key: 'overview', title: 'ภาพรวม', icon: LayoutDashboard, permission: 'appointment.read' },
   { key: 'appointments', title: 'นัดหมายจาก HOSxP', icon: CalendarDays, permission: 'appointment.read' },
+  { key: 'reports', title: 'รายงาน', icon: FileBarChart, permission: 'appointment.read' },
   { key: 'clinics', title: 'คลินิก', icon: Stethoscope, permission: 'clinic.manage' },
   { key: 'notifications', title: 'แจ้งเตือน', icon: Bell, permission: 'notification.read' },
   { key: 'opt-outs', title: 'งดส่งรายคน', icon: UserX, permission: 'optout.manage' },
@@ -46,6 +48,7 @@ export function Workspace({ actor }: { actor: Actor }) {
         {error && <div role="alert" className="error">{error}</div>}
         {tab === 'overview' && <Overview api={api} go={setTab}/>}
         {tab === 'appointments' && <Appointments api={api} canSend={can('notification.send')}/>}
+        {tab === 'reports' && <Reports api={api}/>}
         {tab === 'clinics' && <Clinics api={api}/>}
         {tab === 'notifications' && <Notifications api={api} canManage={can('notification.manage')}/>}
         {tab === 'opt-outs' && <OptOuts api={api}/>}
