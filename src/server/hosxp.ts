@@ -129,6 +129,53 @@ export async function oappSourceState(oappIds: string[], read: SourceReader = so
   return map;
 }
 
+// Report: every appointment in [from, to] with the visit HOSxP linked to it when the patient came (visit_vn).
+export type ReportAppointment = { oapp_id: string; hn: string; patient_name: string; clinic_code: string; clinic_name: string;
+  appointment_date: string; source_status_id: string | null; visit_vn: string | null };
+export async function readReportAppointments(range: { from: string; to: string }, read: SourceReader = sourceReader) {
+  const result: ReportAppointment[] = [];
+  for (let start = range.from; start <= range.to; start = addDays(start, CHUNK_DAYS)) {
+    const end = addDays(start, CHUNK_DAYS - 1) < range.to ? addDays(start, CHUNK_DAYS - 1) : range.to;
+    const rows = await read(`SELECT o.oapp_id,o.hn,o.nextdate,o.clinic,c.name clinic_name,o.oapp_status_id,o.visit_vn,p.fname,p.lname
+      FROM oapp o LEFT JOIN patient p ON p.hn=o.hn LEFT JOIN clinic c ON c.clinic=o.clinic
+      WHERE o.nextdate BETWEEN ? AND ? ORDER BY o.nextdate,o.oapp_id LIMIT ${CHUNK_LIMIT + 1}`, [start, end]);
+    ensure(rows.length <= CHUNK_LIMIT, `นัดช่วง ${start} ถึง ${end} มีมากเกิน ${CHUNK_LIMIT} รายการ`, 422, 'HOSXP_TOO_MANY');
+    result.push(...rows.map(row => ({ oapp_id: String(row.oapp_id), hn: str(row.hn),
+      patient_name: [str(row.fname), str(row.lname)].filter(Boolean).join(' '),
+      clinic_code: str(row.clinic) || NO_CLINIC, clinic_name: str(row.clinic_name),
+      appointment_date: String(row.nextdate).slice(0, 10),
+      source_status_id: row.oapp_status_id == null ? null : String(row.oapp_status_id), visit_vn: str(row.visit_vn) || null })));
+  }
+  return result;
+}
+
+// What each visit was charged, per procedure, and its ICD-10 codes. Read only, by VN.
+// Procedures = non-drug items billed in the visit (opitemrece -> nondrugitems); drugs are left out.
+// ICD-10 = ovstdiag codes named from icd101 (Thai name first); ICD-9 operation codes (all digits) are left out.
+export type VisitCharge = { amount: number; procedures: { name: string; qty: number; amount: number }[]; icd10: { code: string; name: string }[] };
+const money = (v: unknown) => Math.round((Number(v) || 0) * 100) / 100;
+export async function visitCharges(vns: (string | null | undefined)[], read: SourceReader = sourceReader) {
+  const map = new Map<string, VisitCharge>();
+  const ids = [...new Set(vns.map(v => str(v)))].filter(v => /^[0-9A-Za-z]{1,20}$/.test(v));
+  const get = (vn: string) => map.get(vn) ?? map.set(vn, { amount: 0, procedures: [], icd10: [] }).get(vn)!;
+  for (let i = 0; i < ids.length; i += 200) {
+    const batch = ids.slice(i, i + 200), marks = batch.map(() => '?').join(',');
+    for (const row of await read(`SELECT o.vn,o.icode,n.name,SUM(o.qty) qty,SUM(o.sum_price) amount
+      FROM opitemrece o JOIN nondrugitems n ON n.icode=o.icode WHERE o.vn IN (${marks})
+      GROUP BY o.vn,o.icode,n.name ORDER BY o.vn,n.name`, batch)) {
+      const v = get(String(row.vn)), amount = money(row.amount);
+      v.procedures.push({ name: str(row.name) || str(row.icode), qty: Number(row.qty) || 0, amount });
+      v.amount = money(v.amount + amount);
+    }
+    for (const row of await read(`SELECT d.vn,d.icd10 code,COALESCE(NULLIF(i.tname,''),i.name) name FROM ovstdiag d LEFT JOIN icd101 i ON i.code=d.icd10
+      WHERE d.vn IN (${marks}) ORDER BY d.vn,d.diagtype,d.icd10`, batch)) {
+      const code = str(row.code).toUpperCase(), v = get(String(row.vn));
+      if (/^[A-Z]\d/.test(code) && !v.icd10.some(c => c.code === code)) v.icd10.push({ code, name: str(row.name) });
+    }
+  }
+  return map;
+}
+
 export async function readClinics(read: SourceReader = sourceReader) {
   const found = await read('SELECT clinic,name FROM clinic ORDER BY clinic', []);
   return found.map(row => ({ code: str(row.clinic), name: str(row.name) })).filter(c => c.code && c.code.length <= 20);

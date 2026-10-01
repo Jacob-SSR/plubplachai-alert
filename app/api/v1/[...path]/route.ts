@@ -8,6 +8,7 @@ import { audit } from '@/src/server/audit';
 import { notificationSettings, retryNotification, sendManualNotification, sendTestNotification } from '@/src/server/notifications';
 import { addOptOut, createUser, listAppointments, listClinics, listNotifications, listOptOuts, listUsers, overview, removeOptOut, setUserActive, updateClinic } from '@/src/server/admin';
 import { syncClinics } from '@/src/server/sync';
+import { appointmentReport } from '@/src/server/report';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,7 @@ async function handle(req: NextRequest, { params }: { params: Promise<{ path: st
     else if (route === 'auth/logout' && method === 'POST') return await logout(req, actor);
     else if (route === 'overview' && method === 'GET') { allow('appointment.read'); result = await overview(); }
     else if (route === 'appointments' && method === 'GET') { allow('appointment.read'); result = await listAppointments(url); }
+    else if (route === 'reports' && method === 'GET') { allow('appointment.read'); result = await appointmentReport(url); }
     else if (route === 'clinics' && method === 'GET') { allow('appointment.read'); result = await listClinics(); }
     else if (route === 'clinics/sync' && method === 'POST') { allow('clinic.manage'); result = { count: await syncClinics() }; }
     else if (path[0] === 'clinics' && path.length === 2 && method === 'PATCH') { allow('clinic.manage'); result = await updateClinic(z.string().max(20).parse(path[1]), await jsonBody(req), actor); }
