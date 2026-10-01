@@ -64,3 +64,8 @@ small.lab-tests{display:block;color:#763993}
 .error-text{color:var(--danger)}
 .clinic-note{white-space:pre-line;font-size:13px;display:block;margin-bottom:4px}
 td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}td small{display:block}.badge.status-attended{background:#e4f2dd;color:#2f5d1f}.badge.status-pending{background:#e1effa;color:#15567f}.badge.status-missed{background:#fde4e1;color:#9f1d12}
+
+/* Notice preview header: same photo and fade as the LINE card (noticeFlex photoHeader). */
+.notice-card-head{--head:#0d5b44;min-height:150px;background:linear-gradient(90deg,var(--head) 0%,color-mix(in srgb,var(--head) 80%,transparent) 50%,transparent 100%),url(/hospital-header.jpg) center/cover}
+.notice-card.kind-reminder .notice-card-head{--head:#b45309}.notice-card.kind-changed .notice-card-head{--head:#1d4ed8}.notice-card.kind-cancelled .notice-card-head{--head:#b91c1c}
+.notice-card-head>div{max-width:62%}
