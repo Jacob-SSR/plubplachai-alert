@@ -1,6 +1,7 @@
 // Appointment notice sent to the patient's LINE หมอพร้อม. Plain text, HTML and a Flex card come from one Notice.
 export type NoticeKind = 'NEW' | 'CHANGED' | 'REMINDER' | 'MANUAL' | 'CANCELLED';
-export type Notice = { kind: NoticeKind; name: string; date: string; time: string | null; clinic: string; location: string; daysBefore?: number;
+export type Notice = { kind: NoticeKind; name: string; date: string; time: string | null;
+  /** false hides the logo + hospital name row on the card header (admin setting show_brand) */ showBrand?: boolean; clinic: string; location: string; daysBefore?: number;
   /** LAB items from HOSxP (ticked note2 + LAB order form) */ tests?: string[];
   /** Preparation instructions ticked in HOSxP (note1 / perform_text) */ preparation?: string[];
   /** The clinic's own standing advice, set by admin in the web */ clinicNote?: string;
@@ -129,10 +130,10 @@ const FILL = { position: 'absolute', offsetStart: '0px', offsetEnd: '0px' };
 // Flex boxes cannot take a background image, so photo, gradient and text are stacked with absolute positioning.
 function flexHeader(n: Notice, color: string, logoUrl?: string, photoUrl?: string) {
   const content = { type: 'box', layout: 'vertical', spacing: 'xs', contents: [
-    { type: 'box', layout: 'horizontal', spacing: 'sm', alignItems: 'center', contents: [
+    ...(n.showBrand === false ? [] : [{ type: 'box', layout: 'horizontal', spacing: 'sm', alignItems: 'center', contents: [
       ...(logoUrl ? [{ type: 'box', layout: 'vertical', width: '28px', height: '28px', cornerRadius: '14px', backgroundColor: '#FFFFFF', flex: 0,
         contents: [{ type: 'image', url: logoUrl, size: 'full', aspectMode: 'cover', aspectRatio: '1:1' }] }] : []),
-      { type: 'text', text: HOSPITAL_NAME, color: '#FFFFFF', size: 'xs', weight: 'bold', gravity: 'center' }] },
+      { type: 'text', text: HOSPITAL_NAME, color: '#FFFFFF', size: 'xs', weight: 'bold', gravity: 'center' }] }]),
     { type: 'text', text: noticeTitle(n), color: '#FFFFFF', size: 'lg', weight: 'bold', wrap: true }] };
   if (!photoUrl) return { type: 'box', layout: 'vertical', backgroundColor: color, paddingAll: '16px', contents: [content] };
   return { type: 'box', layout: 'vertical', paddingAll: '0px', contents: [

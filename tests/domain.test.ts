@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { inSendWindow, nextSendTime } from '../src/domain/send-window';
-import { noticeText, noticeMessage, noticePreparation, noticeFlex, type Notice } from '../src/domain/notice';
+import { noticeText, noticeMessage, noticePreparation, noticeFlex, noticeTitle, type Notice } from '../src/domain/notice';
 import { validCid } from '../src/domain/validation';
 import { mophRequest, classifyResponse } from '../src/providers/moph-alert';
 
@@ -84,4 +84,13 @@ test('flex card: photo header fading into the notice colour, date box first, pla
     Object.assign(process.env, { APP_ORIGIN: 'http://192.168.1.5:5600' });
     assert.equal(publicHeaderUrl(), undefined, 'LINE cannot load a LAN or http address');
   } finally { process.env = saved; }
+});
+
+test('show_brand off hides the logo and hospital name row on the card header, title stays', () => {
+  const n: Notice = { kind: 'NEW', name: 'ทดสอบ', date: '2027-01-29', time: '09:00:00', clinic: 'ทันตกรรม', location: 'ห้องบัตร' };
+  const shown = JSON.stringify((noticeFlex(n, 'https://example.test/hospital-logo.png', 'https://example.test/hospital-header.jpg') as { contents: { header: unknown } }).contents.header);
+  const hidden = JSON.stringify((noticeFlex({ ...n, showBrand: false }, 'https://example.test/hospital-logo.png', 'https://example.test/hospital-header.jpg') as { contents: { header: unknown } }).contents.header);
+  assert.ok(shown.includes('hospital-logo.png') && shown.includes('"text":"โรงพยาบาลพลับพลาชัย"'));
+  assert.ok(!hidden.includes('hospital-logo.png') && !hidden.includes('"text":"โรงพยาบาลพลับพลาชัย"'));
+  assert.ok(hidden.includes('hospital-header.jpg') && hidden.includes(noticeTitle(n)));
 });

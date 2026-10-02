@@ -13,7 +13,7 @@ export function NoticeCard({ notice }: { notice: Notice }) {
   const steps = noticePreparation(notice), cancelled = notice.kind === 'CANCELLED';
   return <div className={`notice-card kind-${notice.kind.toLowerCase()}`}>
     <div className="nc-head"><div className="nc-head-text">
-      <span className="nc-org"><img src="/hospital-logo.png" alt="" width={28} height={28}/* eslint-disable-line @next/next/no-img-element */ />{HOSPITAL_NAME}</span>
+      {notice.showBrand !== false && <span className="nc-org"><img src="/hospital-logo.png" alt="" width={28} height={28}/* eslint-disable-line @next/next/no-img-element */ />{HOSPITAL_NAME}</span>}
       <strong>{noticeTitle(notice)}</strong></div></div>
     <div className="nc-body">
       <p className="nc-greet">เรียน คุณ{notice.name}</p>
@@ -28,13 +28,13 @@ export function NoticeCard({ notice }: { notice: Notice }) {
   </div>;
 }
 
-export function NoticePreview() {
+export function NoticePreview({ showBrand = true }: { showBrand?: boolean }) {
   const [kind, setKind] = useState<NoticeKind>('NEW');
   return <section className="surface padded" aria-label="ตัวอย่างข้อความแจ้งเตือน"><div className="section-head"><div>
     <h3>ตัวอย่างข้อความที่ผู้ป่วยได้รับใน LINE หมอพร้อม</h3>
     <p className="helper">การ์ด LINE Flex ส่งผ่าน MOPH Alert · ถ้า MOPH ไม่รับการ์ดนี้ ระบบจะส่งเป็นการ์ดมาตรฐานของ MOPH แทน</p></div></div>
     <div className="subnav">{KINDS.map(([k, label]) => <button key={k} aria-pressed={kind === k} onClick={() => setKind(k)}>{label}</button>)}</div>
-    <div className="notice-preview"><NoticeCard notice={{ ...SAMPLE, kind }}/>
+    <div className="notice-preview"><NoticeCard notice={{ ...SAMPLE, kind, showBrand }}/>
       <div className="notice-when"><h4>ส่งเมื่อไหร่</h4><ul>
         <li><strong>ลงนัดใหม่ / เลื่อนนัด</strong> เมื่อ worker พบนัดใหม่ หรือวัน เวลา คลินิก จุดติดต่อเปลี่ยนใน HOSxP</li>
         <li><strong>ก่อนวันนัด</strong> ตามรอบที่ตั้ง เริ่มส่งตามเวลาที่กำหนด (ค่าเริ่มต้น 08:00 น.)</li>

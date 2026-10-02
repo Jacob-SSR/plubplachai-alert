@@ -33,18 +33,18 @@ async function handle(req: NextRequest, { params }: { params: Promise<{ path: st
     else if (route === 'notification-settings' && method === 'PATCH') {
       allow('notification.manage');
       const input = z.object({ enabled: z.boolean(), mode: z.enum(['DRY_RUN', 'LIVE']), version: id, notifyNew: z.boolean(), notifyCancel: z.boolean(),
-        reminderTime: clock, windowStart: clock, windowEnd: clock, days: z.array(z.number().int().min(0).max(30)).max(3), confirmLive: z.boolean().default(false) }).parse(await jsonBody(req));
+        reminderTime: clock, windowStart: clock, windowEnd: clock, days: z.array(z.number().int().min(0).max(30)).max(3), confirmLive: z.boolean().default(false), showBrand: z.boolean().default(true) }).parse(await jsonBody(req));
       ensure(input.windowStart < input.windowEnd, 'เวลาเริ่มส่งต้องก่อนเวลาหยุดส่ง');
       if (input.enabled && input.mode === 'LIVE') ensure(input.confirmLive && process.env.MOPH_LIVE_ENABLED === 'true' && process.env.MOPH_CLIENT_KEY && process.env.MOPH_SECRET_KEY, 'ต้องยืนยันเปิดส่งจริงและตั้งค่าฝั่ง server ครบก่อน');
       result = await transaction(async db => {
-        const r = await execute('UPDATE notification_settings SET enabled=?,mode=?,notify_new=?,notify_cancel=?,reminder_time=?,window_start=?,window_end=?,version=version+1 WHERE id=1 AND version=?',
-          [input.enabled, input.mode, input.notifyNew, input.notifyCancel, input.reminderTime, input.windowStart, input.windowEnd, input.version], db);
+        const r = await execute('UPDATE notification_settings SET enabled=?,mode=?,notify_new=?,notify_cancel=?,reminder_time=?,window_start=?,window_end=?,show_brand=?,version=version+1 WHERE id=1 AND version=?',
+          [input.enabled, input.mode, input.notifyNew, input.notifyCancel, input.reminderTime, input.windowStart, input.windowEnd, input.showBrand, input.version], db);
         ensure(r.affectedRows, 'ข้อมูลเปลี่ยนแล้ว กรุณาโหลดใหม่', 409);
         await execute('UPDATE notification_rules SET active=0', [], db);
         for (const day of new Set(input.days)) await execute('INSERT INTO notification_rules(days_before,active) VALUES(?,1) ON DUPLICATE KEY UPDATE active=1', [day], db);
         await execute("UPDATE notification_jobs j JOIN notification_rules r ON r.id=j.rule_id SET j.status='CANCELLED',j.safe_error='RULE_DISABLED' WHERE r.active=0 AND j.status='PENDING'", [], db);
         await audit(db, actor.id, 'SETTINGS', 'notification_settings', 1, { enabled: input.enabled, mode: input.mode, notifyNew: input.notifyNew, notifyCancel: input.notifyCancel,
-          reminderTime: input.reminderTime, window: `${input.windowStart}-${input.windowEnd}`, days: input.days });
+          reminderTime: input.reminderTime, window: `${input.windowStart}-${input.windowEnd}`, days: input.days, showBrand: input.showBrand });
         return { ok: true };
       });
     }

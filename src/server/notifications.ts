@@ -9,6 +9,12 @@ import { MophAlertProvider, type Delivery, type NotificationProvider } from '../
 import { readForNotice, readPatient } from './hosxp';
 import { activeStatus, fingerprint, futureAppointment, queueJob, refreshAppointment } from './sync';
 
+// Admin switch for the logo + hospital name row on the card. Read with SELECT * so a database that has not
+// run migration 002 yet still sends (with the row shown).
+export async function showBrand() {
+  const [s] = await rows('SELECT * FROM notification_settings WHERE id=1');
+  return s?.show_brand == null || !!Number(s.show_brand);
+}
 export async function notificationSettings() {
   const [settings] = await rows('SELECT * FROM notification_settings WHERE id=1');
   const [sync] = await rows('SELECT initialized,last_success_at,last_error,last_error_at,last_count FROM sync_state WHERE id=1');
@@ -101,7 +107,7 @@ export async function dispatchOne(deps: DispatchDeps = {}, jobId?: string, manua
     await execute("INSERT INTO notification_attempts(job_id,attempt_no,outcome) VALUES(?,?,'STARTED')", [id, attemptNo], db);
   });
   let delivery: Delivery;
-  try { delivery = await provider.send(cid, noticeMessage(notice)); } catch { delivery = { outcome: 'UNKNOWN', safeError: 'การเชื่อมต่อขัดข้อง อาจส่งแล้ว ต้องตรวจสอบก่อนส่งซ้ำ' }; }
+  try { delivery = await provider.send(cid, noticeMessage({ ...notice, showBrand: await showBrand() })); } catch { delivery = { outcome: 'UNKNOWN', safeError: 'การเชื่อมต่อขัดข้อง อาจส่งแล้ว ต้องตรวจสอบก่อนส่งซ้ำ' }; }
   await transaction(async db => {
     const status = statusOf(delivery);
     await execute("UPDATE notification_jobs SET status=?,safe_error=?,accepted_at=IF(?='ACCEPTED',UTC_TIMESTAMP(6),NULL),lease_until=NULL WHERE id=? AND status='SENDING'",
