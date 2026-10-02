@@ -4,7 +4,7 @@ import { ReminderRounds } from './reminder-rounds';
 import { NoticePreview } from './notice-preview';
 import { Field, FormPanel, Table, STATUS_NAMES, KIND_NAMES, n, s, reason, thaiDate, time, useLoad, type Api, type Item } from './ui';
 
-type Settings = Item & { enabled: number; mode: string; notify_new: number; notify_cancel: number; reminder_time: string; window_start: string; window_end: string;
+type Settings = Item & { show_brand?: number; enabled: number; mode: string; notify_new: number; notify_cancel: number; reminder_time: string; window_start: string; window_end: string;
   version: number; rules: Item[]; credentialConfigured: boolean; serverLiveEnabled: boolean };
 type Job = { id: string; kind: string; status: string; safe_error: string | null; attempt_count: number; created_at: string; available_at: string;
   days_before: number | null; hn: string; patient_name: string; appointment_date: string; appointment_time: string | null; clinic_name: string | null };
@@ -28,12 +28,13 @@ export function Notifications({ api, canManage }: { api: Api; canManage: boolean
     {editing && st && <FormPanel title="ตั้งค่าการแจ้งเตือน" onClose={() => setEditing(false)} onSubmit={async f => {
       await api('notification-settings', 'PATCH', { enabled: f.get('enabled') === 'on', mode: f.get('mode'), version: st.version,
         notifyNew: f.get('notifyNew') === 'on', notifyCancel: f.get('notifyCancel') === 'on', reminderTime: f.get('reminderTime'), windowStart: f.get('windowStart'), windowEnd: f.get('windowEnd'),
-        days: [...new Set(f.getAll('days').map(Number).filter(d => Number.isInteger(d) && d >= 0 && d <= 30))], confirmLive: f.get('confirmLive') === 'on' });
+        days: [...new Set(f.getAll('days').map(Number).filter(d => Number.isInteger(d) && d >= 0 && d <= 30))], confirmLive: f.get('confirmLive') === 'on', showBrand: f.get('showBrand') === 'on' });
       reload(); }}>
       <label className="checkbox"><input name="enabled" type="checkbox" defaultChecked={!!st.enabled}/>เปิดการแจ้งเตือนอัตโนมัติ</label>
       <label>โหมด<select name="mode" defaultValue={st.mode}><option value="DRY_RUN">ทดสอบ (ไม่ส่งจริง)</option><option value="LIVE">ส่งจริง</option></select></label>
       <label className="checkbox"><input name="notifyNew" type="checkbox" defaultChecked={!!st.notify_new}/>แจ้งทันทีเมื่อลงนัดใหม่หรือเลื่อนนัดใน HOSxP</label>
       <label className="checkbox"><input name="notifyCancel" type="checkbox" defaultChecked={!!st.notify_cancel}/>แจ้งเมื่อนัดที่ยังไม่ถึงวันถูกยกเลิกใน HOSxP</label>
+      <label className="checkbox span-all"><input name="showBrand" type="checkbox" defaultChecked={st.show_brand == null || !!st.show_brand}/>แสดงโลโก้และชื่อโรงพยาบาลบนหัวการ์ด LINE</label>
       <ReminderRounds rules={st.rules}/>
       <Field label="เวลาเริ่มส่งข้อความเตือนก่อนวันนัด" name="reminderTime" type="time" defaultValue={hm(st.reminder_time)} required/>
       <Field label="ส่งได้ตั้งแต่" name="windowStart" type="time" defaultValue={hm(st.window_start)} required/>
@@ -42,7 +43,7 @@ export function Notifications({ api, canManage }: { api: Api; canManage: boolean
       <label className="checkbox span-all"><input type="checkbox" name="confirmLive"/>ยืนยันเปิดส่งจริงถึงผู้ป่วยของคลินิกที่เปิดไว้</label>
       <p className="helper span-all">สถานะ server: {st.credentialConfigured ? 'ตั้งค่า Client_ID และ Secret แล้ว' : 'ยังไม่ได้ตั้ง Client_ID และ Secret'} · {st.serverLiveEnabled ? 'อนุญาตส่งจริง' : 'ยังไม่อนุญาตส่งจริง (MOPH_LIVE_ENABLED)'}</p>
     </FormPanel>}
-    <NoticePreview/>
+    <NoticePreview showBrand={!st || st.show_brand == null || !!st.show_brand}/>
     {canManage && <TestSend api={api}/>}
     {retry && <FormPanel title="ตรวจสอบก่อนส่งซ้ำ" onClose={() => setRetry(undefined)} onSubmit={async f => { await api(`notifications/${retry.id}/retry`, 'POST', { reason: f.get('reason'), acknowledgeUnknown: f.get('ack') === 'on' }); jobs.reload(); }}>
       <p className="span-all">{retry.patient_name} (HN {retry.hn}) · {thaiDate(retry.appointment_date)} · {STATUS_NAMES[retry.status]}</p>
