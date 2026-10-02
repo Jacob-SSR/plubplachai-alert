@@ -13,7 +13,7 @@ export function Users({ api, selfId }: { api: Api; selfId: number }) {
       await api('users', 'POST', { username: f.get('username'), displayName: f.get('displayName'), password: f.get('password'), role: f.get('role') }); reload(); }}>
       <Field label="ชื่อผู้ใช้" name="username" required autoComplete="off"/>
       <Field label="ชื่อที่แสดง" name="displayName" required/>
-      <Field label="รหัสผ่าน (อย่างน้อย 12 อักขระ)" name="password" type="password" minLength={12} required autoComplete="new-password"/>
+      <Field label="รหัสผ่าน (อย่างน้อย 6 อักขระ)" name="password" type="password" minLength={6} required autoComplete="new-password"/>
       <label>บทบาท<select name="role" defaultValue="STAFF"><option value="STAFF">เจ้าหน้าที่</option><option value="ADMIN">ผู้ดูแลระบบ</option></select></label>
     </FormPanel>}
     {message && <p role="alert" className="error">{message}</p>}

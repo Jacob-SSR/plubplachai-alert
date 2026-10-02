@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readAppointments, readForNotice, readClinics, toAppointment, NO_CLINIC, type SourceReader } from '../src/server/hosxp';
 import { activeStatus, fingerprint, futureAppointment } from '../src/server/sync';
-import { appointmentReport } from '../src/server/report';
+import { appointmentReport, appointmentReportExcel } from '../src/server/report';
 
 const row = { oapp_id: '9007199254740993', hn: '0001234', fname: 'สมชาย ', lname: 'ใจดี', nextdate: '2026-10-02', nexttime: '09:00:00',
   clinic: '012', clinic_name: 'คลินิกเบาหวาน', contact_point: '', department_name: 'OPD', oapp_status_id: null, doctor_name: 'แพทย์สมมติ',
@@ -87,4 +87,19 @@ test('report reads visits, sums procedure money once per visit, and groups by pr
   assert.deepEqual(r.clinics.map(c => [c.name, c.amount]), [['แผนไทย', 300.5], ['ไม่ระบุคลินิก', 0]]);
   await assert.rejects(appointmentReport(new URLSearchParams({ from: '2026-09-01', to: '2026-10-15' }), reader), /31 วัน/);
   await assert.rejects(appointmentReport(new URLSearchParams({ from: '2026-09-01', to: '2026-09-02' }), async () => { throw Error('Unknown column'); }), /icd101/);
+});
+
+test('report Excel has one sheet per report table with the visit money', async () => {
+  const { default: ExcelJS } = await import('exceljs');
+  const reader: SourceReader = async (sql, values) => {
+    if (/FROM oapp o/.test(sql)) return values[0] === '2026-09-01' ? [{ oapp_id: '1', hn: '01', fname: 'ก', lname: 'ข', nextdate: '2026-09-01', clinic: '012', clinic_name: 'แผนไทย', oapp_status_id: null, visit_vn: '690901080000' }] : [];
+    if (/opitemrece/.test(sql)) return [{ vn: '690901080000', icode: 'x', name: 'นวดไทย', qty: 1, amount: '250' }];
+    return [{ vn: '690901080000', code: 'M545', name: 'ปวดหลังส่วนล่าง' }];
+  };
+  const file = await appointmentReportExcel(new URLSearchParams({ from: '2026-09-01', to: '2026-09-02' }), reader);
+  const book = new ExcelJS.Workbook(); await book.xlsx.load(file.buffer as unknown as ArrayBuffer);
+  assert.deepEqual(book.worksheets.map(w => w.name), ['สรุปตามคลินิก', 'สรุปตามหัตถการ', 'สรุปตาม ICD-10', 'รายการ']);
+  assert.deepEqual(book.getWorksheet('สรุปตามคลินิก')!.getRow(3).values, [, 'รวม', 1, 1, 0, 0, 250]);
+  assert.equal(book.getWorksheet('รายการ')!.getRow(2).getCell(8).value, 250);
+  assert.equal(book.getWorksheet('รายการ')!.getColumn(8).numFmt, '#,##0.00');
 });

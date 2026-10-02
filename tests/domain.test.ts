@@ -82,7 +82,9 @@ test('flex card: photo header fading into the notice colour, date box first, pla
     Object.assign(process.env, { APP_ORIGIN: 'https://hc.example.test/', PUBLIC_LOGO_URL: '', PUBLIC_HEADER_URL: '' });
     assert.equal(publicHeaderUrl(), 'https://hc.example.test/hospital-header.jpg');
     Object.assign(process.env, { APP_ORIGIN: 'http://192.168.1.5:5600' });
-    assert.equal(publicHeaderUrl(), undefined, 'LINE cannot load a LAN or http address');
+    assert.equal(publicHeaderUrl(), 'https://raw.githubusercontent.com/Jacob-SSR/plubplachai-alert/main/public/hospital-header.jpg', 'LAN http web: the public copy on GitHub');
+    Object.assign(process.env, { PUBLIC_HEADER_URL: 'https://cdn.example.test/front.jpg' });
+    assert.equal(publicHeaderUrl(), 'https://cdn.example.test/front.jpg');
   } finally { process.env = saved; }
 });
 
@@ -93,4 +95,13 @@ test('show_brand off hides the logo and hospital name row on the card header, ti
   assert.ok(shown.includes('hospital-logo.png') && shown.includes('"text":"โรงพยาบาลพลับพลาชัย"'));
   assert.ok(!hidden.includes('hospital-logo.png') && !hidden.includes('"text":"โรงพยาบาลพลับพลาชัย"'));
   assert.ok(hidden.includes('hospital-header.jpg') && hidden.includes(noticeTitle(n)));
+});
+
+test('report pager shows first, last and the pages around the current one', async () => {
+  const { pageList } = await import('../components/report-kit');
+  assert.deepEqual(pageList(1, 1), [1]);
+  assert.deepEqual(pageList(1, 4), [1, 2, '…', 4]);
+  assert.deepEqual(pageList(5, 9), [1, '…', 4, 5, 6, '…', 9]);
+  assert.deepEqual(pageList(2, 3), [1, 2, 3]);
+  assert.deepEqual(pageList(9, 9), [1, '…', 8, 9]);
 });

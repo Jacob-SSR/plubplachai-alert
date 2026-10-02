@@ -1,3 +1,4 @@
+import ExcelJS from 'exceljs';
 import { z } from 'zod';
 import { readReportAppointments, visitCharges, NO_CLINIC, sourceReader, type SourceReader } from './hosxp';
 import { activeStatus } from './sync';
@@ -56,4 +57,27 @@ export async function appointmentReport(params: URLSearchParams, read: SourceRea
   }
   return { from, to, summary: count(rows), clinics, procedures: [...byProcedure.values()].sort((a, b) => b.amount - a.amount),
     icd10: [...byIcd10.values()].sort((a, b) => b.amount - a.amount), rows: rows.map(a => ({ ...a, visit_vn: undefined })) };
+}
+
+const STATUS_TH: Record<string, string> = { ATTENDED: 'มาตามนัด', PENDING: 'ยังไม่ถึงวันนัด', MISSED: 'ไม่มาตามนัด' };
+// Same report as an Excel workbook: one sheet per table on the report page.
+export async function appointmentReportExcel(params: URLSearchParams, read: SourceReader = sourceReader) {
+  const r = await appointmentReport(params, read), book = new ExcelJS.Workbook();
+  const sheet = (name: string, header: string[], rows: (string | number | null)[][], money: number[]) => {
+    const ws = book.addWorksheet(name); ws.addRow(header); for (const row of rows) ws.addRow(row);
+    ws.views = [{ state: 'frozen', ySplit: 1 }]; ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF18584A' } };
+    ws.columns.forEach(c => c.width = 20); for (const col of money) ws.getColumn(col).numFmt = '#,##0.00';
+    return ws;
+  };
+  const s = r.summary;
+  sheet('สรุปตามคลินิก', ['คลินิก', 'นัดทั้งหมด', 'มาตามนัด', 'ไม่มาตามนัด', 'ยังไม่ถึงวันนัด', 'ค่าบริการ (บาท)'],
+    [...r.clinics.map(c => [c.name, c.appointments, c.attended, c.missed, c.pending, c.amount]), ['รวม', s.appointments, s.attended, s.missed, s.pending, s.amount]], [6]);
+  sheet('สรุปตามหัตถการ', ['หัตถการ', 'จำนวนครั้งที่มา', 'จำนวน', 'ค่าบริการ (บาท)'], r.procedures.map(p => [p.name, p.visits, p.qty, p.amount]), [4]);
+  sheet('สรุปตาม ICD-10', ['ICD-10', 'ชื่อโรค', 'จำนวนครั้งที่มา', 'ค่าบริการ (บาท)'], r.icd10.map(c => [c.code, c.name, c.visits, c.amount]), [4]);
+  const list = sheet('รายการ', ['วันนัด', 'HN', 'ผู้ป่วย', 'คลินิก', 'สถานะ', 'ICD-10', 'หัตถการ', 'ค่าบริการ (บาท)'], r.rows.map(a => [a.appointment_date, a.hn, a.patient_name,
+    a.clinic_name || a.clinic_code, STATUS_TH[a.status], a.icd10.map(c => c.name ? `${c.code} ${c.name}` : c.code).join('\n'),
+    a.procedures.map(p => `${p.name} x${p.qty} = ${p.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`).join('\n'), a.amount]), [8]);
+  for (const col of [6, 7]) { list.getColumn(col).width = 40; list.getColumn(col).alignment = { wrapText: true, vertical: 'top' }; }
+  return { from: r.from, to: r.to, buffer: Buffer.from(await book.xlsx.writeBuffer()) };
 }
