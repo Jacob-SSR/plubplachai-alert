@@ -10,7 +10,7 @@ export const grants:Record<string,string[]>={
 };
 export async function bootstrap(username:string|undefined,password:string|undefined) {
   ensure(username && /^[A-Za-z0-9_.-]{3,100}$/.test(username),'ตั้ง ADMIN_USERNAME ให้ถูกต้อง');
-  ensure(password && password.length>=12 && Buffer.byteLength(password)<=72,'ตั้ง ADMIN_PASSWORD อย่างน้อย 12 อักขระ ไม่เกิน 72 bytes');
+  ensure(password && password.length>=6 && Buffer.byteLength(password)<=72,'ตั้ง ADMIN_PASSWORD อย่างน้อย 6 อักขระ ไม่เกิน 72 bytes');
   const hash=await bcrypt.hash(password,12);
   await transaction(async db=>{
     for(const [role,permissions] of Object.entries(grants)) {

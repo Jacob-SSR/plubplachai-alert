@@ -26,3 +26,6 @@ export function errorResponse(error:unknown) {
   console.error({requestId,code:code||'INTERNAL_ERROR',message:error instanceof Error?error.message.slice(0,300):undefined});
   return NextResponse.json({code:'UNAVAILABLE',message:'ระบบยังไม่พร้อม กรุณาตรวจการเชื่อมต่อฐานข้อมูลหรือติดต่อผู้ดูแล',requestId},{status:503});
 }
+export function download(buffer:Buffer,filename:string) {
+  return new NextResponse(new Uint8Array(buffer),{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename="${filename}"`,'Cache-Control':'no-store'}});
+}

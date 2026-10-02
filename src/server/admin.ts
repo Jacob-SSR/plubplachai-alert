@@ -80,7 +80,7 @@ export const listUsers = () => rows(`SELECT u.id,u.username,u.display_name,u.act
   LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id GROUP BY u.id,u.username,u.display_name,u.active ORDER BY u.username`);
 export async function createUser(body: unknown, actor: Actor) {
   const input = z.object({ username: z.string().trim().regex(/^[A-Za-z0-9_.-]{3,100}$/, 'ชื่อผู้ใช้ใช้อักษรอังกฤษ ตัวเลข . _ - 3-100 ตัว'),
-    displayName: text(200), password: z.string().min(12, 'รหัสผ่านอย่างน้อย 12 อักขระ').refine(p => Buffer.byteLength(p) <= 72, 'รหัสผ่านยาวเกิน 72 bytes'),
+    displayName: text(200), password: z.string().min(6, 'รหัสผ่านอย่างน้อย 6 อักขระ').refine(p => Buffer.byteLength(p) <= 72, 'รหัสผ่านยาวเกิน 72 bytes'),
     role: z.enum(['ADMIN', 'STAFF']) }).parse(body);
   const hash = await bcrypt.hash(input.password, 12);
   return transaction(async db => {
