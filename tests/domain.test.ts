@@ -96,3 +96,12 @@ test('show_brand off hides the logo and hospital name row on the card header, ti
   assert.ok(!hidden.includes('hospital-logo.png') && !hidden.includes('"text":"โรงพยาบาลพลับพลาชัย"'));
   assert.ok(hidden.includes('hospital-header.jpg') && hidden.includes(noticeTitle(n)));
 });
+
+test('report pager shows first, last and the pages around the current one', async () => {
+  const { pageList } = await import('../components/report-kit');
+  assert.deepEqual(pageList(1, 1), [1]);
+  assert.deepEqual(pageList(1, 4), [1, 2, '…', 4]);
+  assert.deepEqual(pageList(5, 9), [1, '…', 4, 5, 6, '…', 9]);
+  assert.deepEqual(pageList(2, 3), [1, 2, 3]);
+  assert.deepEqual(pageList(9, 9), [1, '…', 8, 9]);
+});
