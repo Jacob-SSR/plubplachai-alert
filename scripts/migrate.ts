@@ -16,7 +16,8 @@ export async function migrate() {
       const [existing]=await rows<{checksum:string}>('SELECT checksum FROM schema_migrations WHERE name=?',[name],db);
       if(existing) {if(existing.checksum!==checksum) throw new Error(`Applied migration changed: ${name}`);continue;}
       // Reviewed migrations contain no procedures or semicolons inside strings.
-      for(const statement of sql.split(';').map(x=>x.replace(/^\s*--.*$/gm,'').trim()).filter(Boolean)) await db.query(statement);
+      // Comments go first, so a ';' inside a comment never splits a statement.
+      for(const statement of sql.replace(/^\s*--.*$/gm,'').split(';').map(x=>x.trim()).filter(Boolean)) await db.query(statement);
       await execute('INSERT INTO schema_migrations(name,checksum) VALUES(?,?)',[name,checksum],db);
       console.log(`Applied ${name}`);
     }
